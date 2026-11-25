@@ -7,6 +7,7 @@
     "typecheck": "bun --bun tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@flowlet/shared": "workspace:*",
     "hono": "^4.0.0"
   },
   "devDependencies": {
