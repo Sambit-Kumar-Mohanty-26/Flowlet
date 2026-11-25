@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import type { Step } from "@flowlet/shared";
-import { app } from "../app";
+import { createApp } from "../app";
+import { createTestFlowStore } from "../test/flow-store";
 import { runFlow } from "./run-flow";
 
+const app = createApp(createTestFlowStore());
 const receiver = "http://localhost:4000/api/mock/receiver";
 const steps: Step[] = [
   { type: "filter", field: "order.amount", operator: "gt", value: 1000 },

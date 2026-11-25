@@ -15,8 +15,12 @@ const FLOW_LIST_LIMIT = 100;
 const newestFirst = { createdAt: -1, _id: -1 } as const;
 const listProjection = { _id: 1, name: 1, description: 1, enabled: 1, createdAt: 1 } satisfies Record<keyof FlowListDocument, 1>;
 
+export function isFlowId(id: string): boolean {
+  return /^[a-f0-9]{24}$/i.test(id);
+}
+
 function parseFlowId(id: string): ObjectId | null {
-  return /^[a-f0-9]{24}$/i.test(id) ? new ObjectId(id) : null;
+  return isFlowId(id) ? new ObjectId(id) : null;
 }
 
 function toSummary(flow: FlowListDocument): FlowSummary {
