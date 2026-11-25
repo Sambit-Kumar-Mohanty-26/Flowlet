@@ -1,6 +1,10 @@
-import { createFlowSchema, errorResponse, updateFlowSchema } from "@flowlet/shared";
+import {
+  createFlowSchema, errorResponse, runListQuerySchema, updateFlowSchema, validationErrorResponse,
+} from "@flowlet/shared";
 import { Hono } from "hono";
 import { isFlowId, type FlowStore } from "../db/flows";
+import { decodeRunCursor } from "../db/run-cursor";
+import type { RunStore } from "../db/runs";
 import { ApiError } from "./api-error";
 import { parseJsonBody } from "./json-body";
 
@@ -10,7 +14,13 @@ function flowNotFound() {
   return new ApiError(errorResponse("NOT_FOUND", "Flow not found"));
 }
 
-export function createFlowRoutes(store: FlowRepository) {
+export function createFlowRoutes(store: FlowRepository, runs: Pick<RunStore, "list" | "stats">) {
+  async function getFlow(id: string) {
+    const flow = isFlowId(id) ? await store.get(id) : null;
+    if (!flow) throw flowNotFound();
+    return flow;
+  }
+
   const routes = new Hono();
 
   routes.use("*", async (context, next) => {
@@ -31,9 +41,7 @@ export function createFlowRoutes(store: FlowRepository) {
   routes.get("/", async (context) => context.json(await store.list()));
 
   routes.get("/:id", async (context) => {
-    const flow = await store.get(context.req.param("id"));
-    if (!flow) throw flowNotFound();
-    return context.json(flow);
+    return context.json(await getFlow(context.req.param("id")));
   });
 
   routes.patch("/:id", async (context) => {
@@ -46,6 +54,28 @@ export function createFlowRoutes(store: FlowRepository) {
   routes.delete("/:id", async (context) => {
     if (!await store.delete(context.req.param("id"))) throw flowNotFound();
     return context.body(null, 204);
+  });
+
+  routes.get("/:id/runs", async (context) => {
+    const flow = await getFlow(context.req.param("id"));
+    const parsed = runListQuerySchema.safeParse(context.req.query());
+    if (!parsed.success) throw new ApiError(validationErrorResponse(parsed.error));
+
+    const { status, limit, cursor: token } = parsed.data;
+    const cursor = token === undefined ? undefined : decodeRunCursor(token);
+    if (cursor === null) {
+      const message = "Invalid run cursor";
+      throw new ApiError(errorResponse("VALIDATION_ERROR", message, {
+        issues: [{ path: ["cursor"], message }],
+      }));
+    }
+
+    return context.json(await runs.list(flow.id, { status, limit, cursor }));
+  });
+
+  routes.get("/:id/stats", async (context) => {
+    const flow = await getFlow(context.req.param("id"));
+    return context.json(await runs.stats(flow.id));
   });
 
   return routes;

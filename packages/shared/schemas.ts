@@ -6,6 +6,7 @@ import {
   FLOW_STEPS_MAX,
   FLOW_STEPS_MIN,
   HTTP_METHODS,
+  RUN_STATUSES,
 } from "./constants";
 import { isSafeDotPath, isSafeKey } from "./dot-path";
 
@@ -68,3 +69,14 @@ export const createFlowSchema = flowFields.extend({
 });
 
 export const updateFlowSchema = flowFields.partial();
+
+export const runListQuerySchema = z.strictObject({
+  status: z.enum(RUN_STATUSES).optional(),
+  limit: z.string()
+    .regex(/^[1-9][0-9]{0,2}$/, "Limit must be an integer from 1 to 100")
+    .transform(Number)
+    .pipe(z.number().max(100, "Limit must be at most 100"))
+    .optional()
+    .transform((limit) => limit ?? 20),
+  cursor: z.string().min(1).max(60).optional(),
+});

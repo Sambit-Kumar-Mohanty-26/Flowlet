@@ -43,3 +43,21 @@ export interface RunStep {
   error: string | null;
   durationMs: number | null;
 }
+
+export interface RunDetails extends Run {
+  steps: RunStep[];
+}
+
+export interface RunPage {
+  items: Run[];
+  nextCursor: string | null;
+}
+
+export interface RunStats {
+  total: number;
+  success: number;
+  failed: number;
+  filtered: number;
+  avgDurationMs: number;
+  lastRunAt: string | null;
+}
