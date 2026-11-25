@@ -1,0 +1,8 @@
+{
+  "name": "@flowlet/shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "bun --bun tsc -p tsconfig.json"
+  }
+}

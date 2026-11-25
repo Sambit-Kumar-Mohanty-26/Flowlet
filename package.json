@@ -1,0 +1,14 @@
+{
+  "name": "flowlet",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun --bun concurrently --kill-others --names server,web 'bun run --filter @flowlet/server dev' 'bun run --filter @flowlet/web dev'",
+    "migrate": "bun run --filter @flowlet/server migrate",
+    "typecheck": "bun run --filter '@flowlet/*' typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "typescript": "~5.9.0"
+  }
+}
