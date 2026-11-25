@@ -16,3 +16,14 @@ test("unknown routes use the API error envelope", async () => {
     error: { code: "NOT_FOUND", message: "Route not found", details: {} },
   });
 });
+
+test("mock receiver rejects malformed JSON and echoes valid JSON", async () => {
+  const invalid = await app.request("/api/mock/receiver", { method: "POST", body: "{" });
+  expect(invalid.status).toBe(400);
+  expect(await invalid.json()).toMatchObject({ error: { code: "BAD_REQUEST" } });
+
+  const body = [null, "test", 42];
+  const valid = await app.request("/api/mock/receiver", { method: "POST", body: JSON.stringify(body) });
+  expect(valid.status).toBe(200);
+  expect(await valid.json()).toEqual(body);
+});
