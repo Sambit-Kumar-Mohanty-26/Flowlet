@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { createApp } from "./app";
+import { createTestApp } from "./test/app";
 import { createTestFlowStore } from "./test/flow-store";
 
-const app = createApp(createTestFlowStore());
+const app = createTestApp(createTestFlowStore());
 
 test("GET /api/health reports a healthy API", async () => {
   const response = await app.request("/api/health");

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createApp } from "../app";
+import { createTestApp } from "../test/app";
 import { createTestFlowStore, testFlow } from "../test/flow-store";
 
 const flowsPath = "/api/flows";
@@ -11,7 +11,7 @@ function jsonRequest(method: "POST" | "PATCH", body: unknown): RequestInit {
 
 test("create validates the body and returns the saved flow", async () => {
   const store = createTestFlowStore();
-  const app = createApp(store);
+  const app = createTestApp(store);
   const response = await app.request(flowsPath, jsonRequest("POST", {
     name: "Order flow",
     steps: testFlow.steps,
@@ -26,7 +26,7 @@ test("create validates the body and returns the saved flow", async () => {
 test("flow list includes summaries and detail includes steps and the secret", async () => {
   const store = createTestFlowStore();
   store.get.mockResolvedValueOnce(testFlow);
-  const app = createApp(store);
+  const app = createTestApp(store);
   const list = await app.request(flowsPath);
   expect(list.status).toBe(200);
   expect(await list.json()).toEqual([{
@@ -43,7 +43,7 @@ test("flow list includes summaries and detail includes steps and the secret", as
 test("patch validates supplied fields and returns the updated flow", async () => {
   const store = createTestFlowStore();
   store.update.mockResolvedValueOnce({ ...testFlow, enabled: false });
-  const app = createApp(store);
+  const app = createTestApp(store);
   const invalid = await app.request(detailPath, jsonRequest("PATCH", { steps: [] }));
   expect(invalid.status).toBe(400);
   expect(await invalid.json()).toEqual({
@@ -64,7 +64,7 @@ test("patch validates supplied fields and returns the updated flow", async () =>
 test("delete returns 204 with an empty body", async () => {
   const store = createTestFlowStore();
   store.delete.mockResolvedValueOnce(true);
-  const response = await createApp(store).request(detailPath, { method: "DELETE" });
+  const response = await createTestApp(store).request(detailPath, { method: "DELETE" });
 
   expect(response.status).toBe(204);
   expect(await response.text()).toBe("");
@@ -73,7 +73,7 @@ test("delete returns 204 with an empty body", async () => {
 
 test("an invalid ID returns 404 before store access and a missing flow also returns 404", async () => {
   const store = createTestFlowStore();
-  const app = createApp(store);
+  const app = createTestApp(store);
   const invalid = await app.request(`${flowsPath}/invalid`, { method: "PATCH", body: "{" });
   expect(invalid.status).toBe(404);
   expect(store.update).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ test("an invalid ID returns 404 before store access and a missing flow also retu
 
 test("malformed JSON and attempts to set a secret fail before a write", async () => {
   const store = createTestFlowStore();
-  const app = createApp(store);
+  const app = createTestApp(store);
   const malformed = await app.request(flowsPath, { method: "POST", body: "{" });
   expect(malformed.status).toBe(400);
   expect(await malformed.json()).toMatchObject({ error: { code: "BAD_REQUEST" } });
@@ -101,7 +101,7 @@ test("malformed JSON and attempts to set a secret fail before a write", async ()
 test("unexpected repository failures use a generic API error", async () => {
   const store = createTestFlowStore();
   store.list.mockRejectedValueOnce(new Error("database details"));
-  const response = await createApp(store).request(flowsPath);
+  const response = await createTestApp(store).request(flowsPath);
 
   expect(response.status).toBe(500);
   expect(await response.json()).toEqual({

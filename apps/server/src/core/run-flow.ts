@@ -3,7 +3,7 @@ import { executeFilter } from "./filter";
 import { executeHttpRequest, type FetchRequest } from "./http-request";
 import { executeTransform } from "./transform";
 
-type RunResult = Omit<Run, "id" | "flowId" | "payload"> & { steps: RunStep[] };
+export type RunResult = Omit<Run, "id" | "flowId" | "payload"> & { steps: RunStep[] };
 
 async function executeStep(step: Step, data: JsonValue, fetchRequest: FetchRequest) {
   switch (step.type) {

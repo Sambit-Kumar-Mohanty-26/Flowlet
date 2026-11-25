@@ -1,15 +1,23 @@
 import { errorResponse } from "@flowlet/shared";
 import { Hono } from "hono";
+import type { FetchRequest } from "./core/http-request";
+import type { RunStore } from "./db/runs";
 import { ApiError } from "./routes/api-error";
 import { createFlowRoutes } from "./routes/flows";
+import { createHookRoutes } from "./routes/hooks";
 import { mockReceiver } from "./routes/mock-receiver";
 
-export function createApp(flows: Parameters<typeof createFlowRoutes>[0]) {
+export function createApp(
+  flows: Parameters<typeof createFlowRoutes>[0],
+  runs: Pick<RunStore, "save">,
+  fetchRequest?: FetchRequest,
+) {
   const app = new Hono();
 
   app.get("/api/health", (context) => context.json({ status: "ok" }));
   app.route("/api/mock", mockReceiver);
   app.route("/api/flows", createFlowRoutes(flows));
+  app.route("/api/hooks", createHookRoutes(flows, runs, fetchRequest));
 
   app.notFound((context) =>
     context.json(errorResponse("NOT_FOUND", "Route not found"), 404),
