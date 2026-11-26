@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, mock, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import type { Flow } from "@flowlet/shared";
 import { createTestApp, createTestRunStore } from "../test/app";
@@ -46,6 +46,38 @@ test.each(["{", new Uint8Array([34, 255, 34])])("signed malformed JSON or UTF-8 
   expect(response.status).toBe(400);
   expect(await response.json()).toMatchObject({ error: { code: "BAD_REQUEST" } });
   expect(save).not.toHaveBeenCalled();
+});
+
+const httpFlow: Flow = {
+  ...testFlow,
+  steps: [{ type: "http_request", url: "http://localhost:4000/api/mock/receiver", method: "POST" }],
+};
+
+test.each([
+  '{"items":["\\u0000"]}',
+  '{"\\u0000":"value"}',
+  '{"value":"\\ud800"}',
+  '{"\\udc00":"value"}',
+])("signed JSON that PostgreSQL cannot store returns 400 before executing", async (body) => {
+  const fetchRequest = mock(async () => new Response("{}"));
+  const { app, save } = setup(httpFlow, fetchRequest);
+  const response = await app.request(hookPath, request(body, sign(body)));
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({
+    error: { code: "BAD_REQUEST", message: "Body contains a null character or an unpaired Unicode surrogate" },
+  });
+  expect(fetchRequest).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+});
+
+test("signed JSON allows valid Unicode pairs and literal escape text", async () => {
+  const body = '{"order":{"amount":4999,"note":"\\ud83d\\ude80","text":"\\\\u0000"}}';
+  const { app, save } = setup();
+  const response = await app.request(hookPath, request(body, sign(body)));
+
+  expect(response.status).toBe(200);
+  expect(save).toHaveBeenCalledTimes(1);
 });
 
 test("disabled flow returns 409 after signature and JSON validation", async () => {

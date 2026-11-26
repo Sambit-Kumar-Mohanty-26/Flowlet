@@ -19,7 +19,7 @@ Keep `bun run dev` running and run `bun test` in a second terminal. Open [the we
 
 To try the app, create a filter such as `order.amount gt 1000`, then send `{"order":{"amount":4999}}` from the flow detail page. The console signs the request on the server. Open the saved run to see the filter's input and result.
 
-Run `bun run typecheck` for all workspaces. With PostgreSQL running and migrated, use `FLOWLET_TEST_POSTGRES=1 bun test` to include the database integration test.
+Run `bun run typecheck` for all workspaces. With PostgreSQL running and migrated, use `FLOWLET_TEST_POSTGRES=1 bun test` to include the database integration tests.
 
 ## Code organization
 
@@ -38,15 +38,28 @@ The step engine can run with a provided fetch function, so tests exercise HTTP b
 
 The required flow CRUD, signed webhooks, three step types, run history and stats, and responsive web console are implemented. The project includes the mock receiver, idempotent SQL migrations, and tests for validation, execution, and pagination. The optional extras are out of scope for this submission.
 
-The startup sequence was verified from a fresh clone with empty database volumes. The signed order example succeeded at 4999 and skipped the later steps at 500. Type checking, all 59 default tests, the PostgreSQL integration test, and the browser workflow at 375 px passed.
+The startup sequence was verified from a fresh clone with empty database volumes. The signed order example succeeded at 4999 and skipped the later steps at 500. Type checking, all 66 default tests, both PostgreSQL integration tests, and the browser workflow at 375 px passed.
 
 The console has no user authentication and is intended for local, single-user use. Incoming webhook requests still require a valid signature. The flow list returns the newest 100 definitions.
 
 HTTP steps make one attempt with a five-second timeout and have no retry or backoff. They accept configured HTTP and HTTPS destinations, including the local mock receiver. For a public deployment, outbound requests would need destination controls to prevent access to private services. PostgreSQL can roll back history writes when persistence fails. Requests already sent to external services can still have effects.
 
+During verification I found and fixed two JSONB edge cases. Signed JSON with a null character or an unpaired Unicode surrogate now returns HTTP 400 before any steps run. A null byte in an HTTP response is shown as `�` in the saved preview, so the run and response status are still recorded.
+
+**Known issues:** None found beyond the limitations above in the workflows tested.
+
 ## Time and AI tools
 
-Total time spent was **12 hours**. I used OpenAI Codex to help implement, test, troubleshoot, and document the project. I used Piper with an Indian English voice model to generate narration for the demo.
+I estimate I spent **about 12 hours** on the project. This is a rough breakdown based on the work I completed.
+
+| Work | Estimated time | What I did and why |
+| --- | ---: | --- |
+| Planning and setup | 1 hour | I mapped the brief to the data model and set up the Bun workspaces and Docker services so the project could start from one set of commands. |
+| Backend | 6 hours | I built the flow store, webhook verification, step engine, and run history first so I could test the API before wiring up the console. |
+| Frontend | 3 hours | I built the flow editor, signed test-event form, and run timeline around the API so I could test the full workflow in the browser. |
+| Verification, README, and demo | 2 hours | I ran the tests from a fresh clone, reproduced the sample webhook, checked the console at 375 px, and prepared the README and walkthrough. |
+
+I used OpenAI Codex to help implement, test, troubleshoot, and document the project. I used Piper with an Indian English voice model to generate narration for the demo.
 
 ## Design questions
 
@@ -64,9 +77,8 @@ The unique `idx_run_steps_run_position` supports reading a run's timeline in ord
 
 ### What happens if the same event is delivered twice?
 
-Each accepted delivery runs independently and receives its own run ID.
-If the flow includes an HTTP step, both deliveries can send a request, so a downstream side effect can happen twice.
-Deduplication would need a stable event ID and a reliable way to claim it before executing steps.
+I deliberately kept deliveries independent within the 12-hour scope. Each accepted delivery gets a run ID, so sending the same event twice can also trigger the same downstream HTTP call twice.
+Deduplication with `X-Event-Id` would be the first extra I would add. I would atomically claim the sender's event ID per flow before executing any steps so concurrent deliveries cannot both claim it.
 
 ### What happens to run history when a flow is deleted?
 

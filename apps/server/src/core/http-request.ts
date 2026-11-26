@@ -22,7 +22,9 @@ async function readResponseBody(body: ReadableStream<Uint8Array> | null): Promis
       length += Math.min(remaining, chunk.value.length);
     }
 
-    return new TextDecoder().decode(bytes.subarray(0, length), { stream: length === bytes.length });
+    const preview = new TextDecoder().decode(bytes.subarray(0, length), { stream: length === bytes.length });
+    // PostgreSQL JSONB cannot store a NUL in the response preview.
+    return preview.replaceAll("\0", "\uFFFD");
   } finally {
     if (length === bytes.length) {
       // The stream's cancellation can wait on the producer.

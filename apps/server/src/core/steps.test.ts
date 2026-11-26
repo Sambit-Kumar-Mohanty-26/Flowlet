@@ -75,6 +75,15 @@ test.each([302, 500])("HTTP step preserves status %i and response body on failur
   });
 });
 
+test.each([200, 500])("HTTP step sanitizes NUL in a status %i response preview", async (status) => {
+  const result = await executeHttpRequest(httpStep, {}, async () => new Response("before\0after", { status }));
+
+  expect(result).toEqual({
+    output: { status, body: "before\uFFFDafter" },
+    error: status === 200 ? null : "HTTP request returned status 500",
+  });
+});
+
 test("HTTP step reports a response body timeout", async () => {
   const result = await executeHttpRequest(httpStep, {}, async (_url, { signal }) => {
     return new Response(new ReadableStream<Uint8Array>({

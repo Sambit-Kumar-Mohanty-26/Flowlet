@@ -7,6 +7,17 @@ import type { FlowStore } from "../db/flows";
 import type { RunStore } from "../db/runs";
 import { ApiError } from "./api-error";
 
+const unsupportedJsonbCharacter = /[\u0000\uD800-\uDFFF]/u;
+
+function canStoreAsJsonb(value: JsonValue): boolean {
+  if (typeof value === "string") return !unsupportedJsonbCharacter.test(value);
+  if (value === null || typeof value !== "object") return true;
+
+  return Object.entries(value).every(([key, item]) =>
+    !unsupportedJsonbCharacter.test(key) && canStoreAsJsonb(item),
+  );
+}
+
 function parseEvent(bytes: Uint8Array): JsonValue {
   let body: unknown;
   try {
@@ -17,6 +28,9 @@ function parseEvent(bytes: Uint8Array): JsonValue {
 
   const parsed = jsonValueSchema.safeParse(body);
   if (!parsed.success) throw new ApiError(errorResponse("BAD_REQUEST", "Body must be valid JSON"));
+  if (!canStoreAsJsonb(parsed.data)) {
+    throw new ApiError(errorResponse("BAD_REQUEST", "Body contains a null character or an unpaired Unicode surrogate"));
+  }
   return parsed.data;
 }
 

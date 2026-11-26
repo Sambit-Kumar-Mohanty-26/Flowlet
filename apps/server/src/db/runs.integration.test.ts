@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
 import type { RunStatus } from "@flowlet/shared";
+import { createApp } from "../app";
+import { createTestFlowStore, testFlow } from "../test/flow-store";
 import { createPostgresPool } from "./postgres";
 import { decodeRunCursor } from "./run-cursor";
 import { RunStore } from "./runs";
@@ -50,6 +53,43 @@ test.skipIf(process.env.FLOWLET_TEST_POSTGRES !== "1")(
       expect(await runs.stats(crypto.randomUUID())).toEqual({
         total: 0, success: 0, failed: 0, filtered: 0, avgDurationMs: 0, lastRunAt: null,
       });
+    } finally {
+      try {
+        await pool.query("DELETE FROM runs WHERE flow_id = $1", [flowId]);
+      } finally {
+        await pool.end();
+      }
+    }
+  },
+);
+
+test.skipIf(process.env.FLOWLET_TEST_POSTGRES !== "1")(
+  "Webhook saves a run when the downstream response contains a NUL",
+  async () => {
+    const flowId = crypto.randomUUID().replaceAll("-", "").slice(0, 24);
+    const flows = createTestFlowStore();
+    flows.get.mockResolvedValue({
+      ...testFlow,
+      id: flowId,
+      steps: [{ type: "http_request", method: "POST", url: "http://localhost:4000/api/mock/receiver" }],
+    });
+
+    const pool = createPostgresPool();
+    const runs = new RunStore(pool);
+    try {
+      const app = createApp(flows, runs, async () => new Response("before\0after"));
+      const body = "{}";
+      const signature = createHmac("sha256", testFlow.webhookSecret).update(body).digest("hex");
+      const response = await app.request(`/api/hooks/${flowId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Flowlet-Signature": `sha256=${signature}` },
+        body,
+      });
+
+      expect(response.status).toBe(200);
+      const { runId, status } = await response.json();
+      expect(status).toBe("success");
+      expect((await runs.get(runId))?.steps[0]?.output).toEqual({ status: 200, body: "before\uFFFDafter" });
     } finally {
       try {
         await pool.query("DELETE FROM runs WHERE flow_id = $1", [flowId]);
