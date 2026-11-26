@@ -6,6 +6,7 @@
     "typecheck": "bun --bun tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@flowlet/shared": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
